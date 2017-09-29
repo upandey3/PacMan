@@ -1,6 +1,6 @@
 import sys
 from queue import *
-
+import time
 class MazeSearch:
 
     # Constructor
@@ -60,6 +60,12 @@ class MazeSearch:
 
         while not frontier.empty():
             t = frontier.get()      # Remove from frontier
+
+            ###### Visualize the maze solving ######
+            time.sleep(0.05)
+            print(''.join(self.grid))
+            #######################################
+
             node = t[0]; cost = t[1]
             self.frontierSet.remove(node)
             self.explored.add(node)    # Add to Explored set
@@ -92,7 +98,7 @@ with open(maze_fname) as mFile:
 # print(grid)
 
 maze = MazeSearch(grid)
-newGrid, cost = maze.solve(True)
+newGrid, cost = maze.solve(False)
 newMaze = ''.join(newGrid)
 print(newMaze)
 print ("The path cost is "+ str(cost) + " steps")
