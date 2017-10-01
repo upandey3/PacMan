@@ -149,14 +149,18 @@ class MazeSearch:
                 frontier.put((score, n, cost+1)) # Put in the incremented cost
                 self.frontierSet.add(n)
 
-    def markSolution(self, node):
-        curr = self.parents[node]
-
+    # Prints the final solution path and numbers all the dot positions in the order explored
+    def markSolution(self, curr):
+        dotCount = len(self.dotPositions)
         while (curr != -1):
             y, x = curr; row = self.grid[y] # Get coordinates an corresponding row
             if self.grid[y][x] == 'P':
                 return
-            self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            if (y, x) in self.dotPositions:
+                self.grid[y] = row[:x] + str(dotCount) + row[x+1:] # Mark the visted node with a '.'
+                dotCount -= 1
+            else:
+                self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with the dot number
             curr = self.parents[curr]
 
 if __name__ == "__main__":
