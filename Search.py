@@ -63,7 +63,7 @@ class MazeSearch:
             l.append((y, x-1))
         return l
 
-    # Solves a maze based on a given algorithm and returns (grid, path cost)
+    # Solves a maze based on a given algorithm and returns (grid, path cost, number of nodes expanded)
     def solve(self, algo):
 
         if algo is Algo.A_STAR or algo is Algo.GREEDY:
@@ -90,17 +90,21 @@ class MazeSearch:
                 self.dotCount -= 1     # If a dot position is found, decrement the count
                 if self.dotCount == 0: # Goal test - if all the dot positions have been found
                     self.markSolution(node)
-                    return self.grid, cost
+                    return self.grid, cost, len(self.explored)
+
+            #### Code for printing all explored paths. Helps in Visualization #####
             # y, x = node; row = self.grid[y] # Get coordinates an corresponding row
             # if self.grid[y][x] != 'P':                   # Don't replace the 'P'
             #     self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            #####################################################################
+
             neighbors = self.getValidNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
                 self.parents[n] = node
                 frontier.put((n, cost+1)) # Put in the incremented cost
                 self.frontierSet.add(n)
 
-    # Helper function to solve the maze using A* and
+    # Helper function to solve the maze using A* and Greed. Returns (grid, path cost, number of nodes expanded)
     def solveAG(self, algo):
 
         frontier = PriorityQueue() # Intialize the a priority queue
@@ -122,14 +126,19 @@ class MazeSearch:
             _, node, cost = t
             self.frontierSet.remove(node)
             self.explored.add(node)    # Add to Explored set
+
             if node in self.dotPositions:
                 self.dotCount -= 1     # If a dot position is found, decrement the count
                 if self.dotCount == 0: # Goal test - if all the dot positions have been found
                     self.markSolution(node)
-                    return self.grid, cost
+                    return self.grid, cost, len(self.explored)
+
+            #### Code for printing all explored paths. Helps in Visualization #####
             # y, x = node; row = self.grid[y] # Get coordinates an corresponding row
             # if self.grid[y][x] != 'P':                   # Don't replace the 'P'
             #     self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            #####################################################################
+
             neighbors = self.getValidNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
                 if algo is Algo.A_STAR: # if A*, score is f = g(cost) + h(mDist)
@@ -152,10 +161,11 @@ class MazeSearch:
 
 if __name__ == "__main__":
 
-    algoMap = {'bfs': Algo.BFS, 'dfs': Algo.DFS, 'astar': Algo.A_STAR, 'greedy': Algo.GREEDY}
     if len(sys.argv) < 3:
         raise Exception("Need two arguments: script.py maze.txt algo: astar, greedy, bfs, or dfs")
+
     maze_fname = sys.argv[1]; a = sys.argv[2]
+    algoMap = {'bfs': Algo.BFS, 'dfs': Algo.DFS, 'astar': Algo.A_STAR, 'greedy': Algo.GREEDY}
     if a in algoMap:
         algo = algoMap[a]
     else:
@@ -166,11 +176,12 @@ if __name__ == "__main__":
 
     maze = MazeSearch(grid)
     start = time.time()
-    newGrid, cost = maze.solve(algo)
+    newGrid, cost, nodes_expanded = maze.solve(algo)
     end = time.time()
     newMaze = ''.join(newGrid)
     print(newMaze)
     print ("The path cost is "+ str(cost) + " steps")
+    print("The number of nodes expanded is "+str(nodes_expanded))
     print ("Elapsed time: " + str(end - start))
 
     with open("output.text", "w") as oFile:
