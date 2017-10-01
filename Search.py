@@ -18,7 +18,7 @@ class MazeSearch:
         self.dotPositions = self.getDotPositions()          # Get a set of tuples of dot positions
         self.dotCount = len(self.dotPositions)              # Numbers of dots to find (used for goal test)
         self.start = self.getStartPosition()                # Start position as a tuple
-
+        self.parents = {}
     # Given a maze, returns a hashset of tuples - (row, col) positions of all the dots
     def getDotPositions(self):
         return {(j, i) for j, r in enumerate(self.grid) for i, c in enumerate(r) if c == '.'}
@@ -74,13 +74,14 @@ class MazeSearch:
         frontier.put((self.start, 0))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int)
         self.frontierSet = {self.start} # Creating a set of all the nodes that are in the frontier for finding purposes
         self.explored = set()           # Set of all the nodes that have been already explored
+        self.parents[self.start] = -1
 
         while not frontier.empty():
             t = frontier.get()      # Remove from frontier
 
             ##### Visualize the maze solving ######
-            time.sleep(0.05)
-            print(''.join(self.grid))
+            # time.sleep(0.05)
+            # print(''.join(self.grid))
             ######################################
             node, cost = t
             self.frontierSet.remove(node)
@@ -88,12 +89,14 @@ class MazeSearch:
             if node in self.dotPositions:
                 self.dotCount -= 1     # If a dot position is found, decrement the count
                 if self.dotCount == 0: # Goal test - if all the dot positions have been found
+                    self.markSolution(node)
                     return self.grid, cost
-            y, x = node; row = self.grid[y] # Get coordinates an corresponding row
-            if self.grid[y][x] != 'P':                   # Don't replace the 'P'
-                self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            # y, x = node; row = self.grid[y] # Get coordinates an corresponding row
+            # if self.grid[y][x] != 'P':                   # Don't replace the 'P'
+            #     self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
             neighbors = self.getValidNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
+                self.parents[n] = node
                 frontier.put((n, cost+1)) # Put in the incremented cost
                 self.frontierSet.add(n)
 
@@ -107,13 +110,14 @@ class MazeSearch:
         frontier.put((score, self.start, 0))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int)
         self.frontierSet = {self.start} # Creating a set of all the nodes that are in the frontier for finding purposes
         self.explored = set()           # Set of all the nodes that have been already explored
+        self.parents[self.start] = -1
 
         while not frontier.empty():
             t = frontier.get()      # Remove from frontier
 
             ##### Visualize the maze solving ######
-            time.sleep(0.05)
-            print(''.join(self.grid))
+            # time.sleep(0.05)
+            # print(''.join(self.grid))
             ######################################
             _, node, cost = t
             self.frontierSet.remove(node)
@@ -121,33 +125,48 @@ class MazeSearch:
             if node in self.dotPositions:
                 self.dotCount -= 1     # If a dot position is found, decrement the count
                 if self.dotCount == 0: # Goal test - if all the dot positions have been found
+                    self.markSolution(node)
                     return self.grid, cost
-            y, x = node; row = self.grid[y] # Get coordinates an corresponding row
-            if self.grid[y][x] != 'P':                   # Don't replace the 'P'
-                self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            # y, x = node; row = self.grid[y] # Get coordinates an corresponding row
+            # if self.grid[y][x] != 'P':                   # Don't replace the 'P'
+            #     self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
             neighbors = self.getValidNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
                 if algo is Algo.A_STAR: # if A*, score is f = g(cost) + h(mDist)
                     score = cost+1 + self.mDistance(n, dot)
                 else: # if Greedy, score is Manhattan distance
                     score = self.mDistance(n, dot)
+                self.parents[n] = node
                 frontier.put((score, n, cost+1)) # Put in the incremented cost
                 self.frontierSet.add(n)
 
+    def markSolution(self, node):
+        curr = self.parents[node]
 
+        while (curr != -1):
+            y, x = curr; row = self.grid[y] # Get coordinates an corresponding row
+            if self.grid[y][x] == 'P':
+                return
+            self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            curr = self.parents[curr]
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        raise Exception("Need two arguments: script.py maze.txt")
-    maze_fname = sys.argv[1]
+    algoMap = {'bfs': Algo.BFS, 'dfs': Algo.DFS, 'astar': Algo.A_STAR, 'greedy': Algo.GREEDY}
+    if len(sys.argv) < 3:
+        raise Exception("Need two arguments: script.py maze.txt algo: astar, greedy, bfs, or dfs")
+    maze_fname = sys.argv[1]; a = sys.argv[2]
+    if a in algoMap:
+        algo = algoMap[a]
+    else:
+        raise Exception("Algorithm not valid; Use astar, greedy, bfs, or dfs")
 
     with open(maze_fname) as mFile:
         grid = mFile.readlines() # 2D Matrix of rows(string per line) and cols(character per string)
 
     maze = MazeSearch(grid)
     start = time.time()
-    newGrid, cost = maze.solve(Algo.A_STAR)
+    newGrid, cost = maze.solve(algo)
     end = time.time()
     newMaze = ''.join(newGrid)
     print(newMaze)
