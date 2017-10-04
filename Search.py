@@ -13,12 +13,14 @@ class MazeSearch:
     def __init__(self, grid):
         # Initialize the internal variables
         self.grid = grid       # Intialize the maze grid
-        self.frontierSet = {}  # Creating a set of all the nodes that are in the frontier for finding purposes
+        # self.frontierSet = {}  # Creating a set of all the nodes that are in the frontier for finding purposes
         self.explored = set()  # Set of all the nodes that have been already explored
         self.dotPositions = self.getDotPositions()          # Get a set of tuples of dot positions
         self.dotCount = len(self.dotPositions)              # Numbers of dots to find (used for goal test)
         self.start = self.getStartPosition()                # Start position as a tuple
         self.parents = {}
+        self.frontierMap = {}    # Creating a map of all the nodes that are in the frontier for finding purposes
+
     # Given a maze, returns a hashset of tuples - (row, col) positions of all the dots
     def getDotPositions(self):
         return {(j, i) for j, r in enumerate(self.grid) for i, c in enumerate(r) if c == '.'}
@@ -37,14 +39,13 @@ class MazeSearch:
         y1, x1 = node1
         y2, x2 = node2
         return abs(x2 - x1) + abs(y2 - y1)
-        # return math.sqrt((y2 - y1)**2 + (x2 - x1)**2) # Euclidean distance
 
     # Check whether a node has not been visited yet
     def isUnexplored(self, node):
         return node not in self.explored and node not in self.frontierSet
 
-    # Gets a list of all the valid neighboring nodes that current node can move to
-    def getValidNeighbors(self, pos):
+    # Gets a list of all the non-wall neighboring that current node can move to
+    def getNeighbors(self, pos):
         assert (isinstance(pos, tuple)) # Making sure pos is a type
         l = []     # Initialize the list
         y, x = pos # x = pos[1]; y = pos[0];
@@ -52,15 +53,17 @@ class MazeSearch:
         right = (y, x+1)
         down = (y+1, x)
         left = (y, x-1)
+
         # Check if the surrounding nodes are not walls and are unexplored
-        if (self.grid[up[0]][up[1]] != '%' and self.isUnexplored(up)): # Upper
+        if self.grid[up[0]][up[1]] != '%': # Upper
             l.append((y-1, x))
-        if (self.grid[right[0]][right[1]] != '%' and self.isUnexplored(right)): # Right
+        if self.grid[right[0]][right[1]] != '%': # Right
             l.append((y, x+1))
-        if (self.grid[down[0]][down[1]] != '%' and self.isUnexplored(down)): # Down
+        if self.grid[down[0]][down[1]] != '%': # Down
             l.append((y+1, x))
-        if (self.grid[left[0]][left[1]] != '%' and self.isUnexplored(left)): # Left
-            l.append((y, x-1))
+        if self.grid[left[0]][left[1]] != '%': # Left
+                l.append((y, x-1))
+
         return l
 
     # Solves a maze based on a given algorithm and returns (grid, path cost, number of nodes expanded)
@@ -75,6 +78,7 @@ class MazeSearch:
         self.frontierSet = {self.start} # Creating a set of all the nodes that are in the frontier for finding purposes
         self.explored = set()           # Set of all the nodes that have been already explored
         self.parents[self.start] = -1
+        dotCount = self.dotCount
 
         while not frontier.empty():
             t = frontier.get()      # Remove from frontier
@@ -87,8 +91,8 @@ class MazeSearch:
             self.frontierSet.remove(node)
             self.explored.add(node)    # Add to Explored set
             if node in self.dotPositions:
-                self.dotCount -= 1     # If a dot position is found, decrement the count
-                if self.dotCount == 0: # Goal test - if all the dot positions have been found
+                dotCount -= 1     # If a dot position is found, decrement the count
+                if dotCount == 0: # Goal test - if all the dot positions have been found
                     self.markSolution(node)
                     return self.grid, cost, len(self.explored)
 
@@ -103,65 +107,96 @@ class MazeSearch:
                 self.parents[n] = node
                 frontier.put((n, cost+1)) # Put in the incremented cost
                 self.frontierSet.add(n)
+        raise Exception('Frontier became empty without a solution')
+
+    # Returns the average of distances for all the dots from the current node
+    def averageDistance(self, node, dotPositions):
+        totalDist = 0
+        for d in dotPositions:
+            totalDist += self.mDistance(node, d)
+        return totalDist / len(dotPositions)
 
     # Helper function to solve the maze using A* and Greed. Returns (grid, path cost, number of nodes expanded)
     def solveAG(self, algo):
 
+        ignoreMap = dict()         # IgnoreMap
         frontier = PriorityQueue() # Intialize the a priority queue
-        dot = (list(self.getDotPositions()))[0]
-        score = self.mDistance(self.start, dot) # Manhattan distance for Greedy, MDist + Cost(0) for A*
+        dots = self.getDotPositions()
+        score = self.averageDistance(self.start, list(dots)) # Manhattan distance for Greedy, MDist + Cost(0) for A*
 
-        frontier.put((score, self.start, 0))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int)
-        self.frontierSet = {self.start} # Creating a set of all the nodes that are in the frontier for finding purposes
-        self.explored = set()           # Set of all the nodes that have been already explored
-        self.parents[self.start] = -1
+        frontier.put((score, self.start, 0, dots))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int, {dots})
+        self.frontierMap[self.start] = 0 # Map of nodes to path cost
+        self.parents[(self.start, len(dots))] = -1
 
         while not frontier.empty():
-            t = frontier.get()      # Remove from frontier
+            t = frontier.get()       # Remove from frontier
+            _, node, cost, dots = t  # (score, (y, x), cost, dots)
 
+            if node in ignoreMap and ignoreMap[node] == cost: # If node has inefficient path cost
+                continue
             ##### Visualize the maze solving ######
             # time.sleep(0.05)
             # print(''.join(self.grid))
-            ######################################
-            _, node, cost = t
-            self.frontierSet.remove(node)
-            self.explored.add(node)    # Add to Explored set
+            #####################################
+            del self.frontierMap[node]
+            self.explored.add((node, tuple(dots)))    # Add to Explored set: ((y, x), R)
 
-            if node in self.dotPositions:
-                self.dotCount -= 1     # If a dot position is found, decrement the count
-                if self.dotCount == 0: # Goal test - if all the dot positions have been found
+            if node in dots:
+                dots = set(dots)   # Create a dots set
+                dots.remove(node)  # If a dot position is found, remove it from the dots set
+                if len(dots) == 0:  # Goal test - if all the dot positions have been found
                     self.markSolution(node)
                     return self.grid, cost, len(self.explored)
 
             #### Code for printing all explored paths. Helps in Visualization #####
             # y, x = node; row = self.grid[y] # Get coordinates an corresponding row
             # if self.grid[y][x] != 'P':                   # Don't replace the 'P'
-            #     self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            #     self.grid[y] = row[:x] + 'o' + row[x+1:] # Mark the visted node with a '.'
             #####################################################################
 
-            neighbors = self.getValidNeighbors(node)
+            neighbors = self.getNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
+                # Check if a3lready explored
+                if (n, tuple(dots)) in self.explored:
+                    continue
+
                 if algo is Algo.A_STAR: # if A*, score is f = g(cost) + h(mDist)
-                    score = cost+1 + self.mDistance(n, dot)
+                    score = cost+1 + self.averageDistance(n, dots)
                 else: # if Greedy, score is Manhattan distance
-                    score = self.mDistance(n, dot)
-                self.parents[n] = node
-                frontier.put((score, n, cost+1)) # Put in the incremented cost
-                self.frontierSet.add(n)
+                    score = self.averageDistance(n, dots)
+
+                # Check if already in frontier and if yes, check it has a better path cost
+                if n in self.frontierMap:
+                    if self.frontierMap[n] > cost+1: #Exisitng path cost is worse, then replace
+                        ignoreMap[n] = self.frontierMap[n]
+                    else:
+                        continue
+                self.parents[(n, len(dots))] = node
+                frontier.put((score, n, cost+1, dots)) # Put in the incremented cost
+                self.frontierMap[n] = cost+1
+
+        self.markSolution(node)
+        return self.grid, cost, len(self.explored)
+
+        raise Exception('Frontier became empty without a solution')
 
     # Prints the final solution path and numbers all the dot positions in the order explored
     def markSolution(self, curr):
-        dotCount = len(self.dotPositions)
+        s = '123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        chars = list(s)
+        dotCount = self.dotCount
+        dotsRemaining = 0
         while (curr != -1):
             y, x = curr; row = self.grid[y] # Get coordinates an corresponding row
             if self.grid[y][x] == 'P':
                 return
             if (y, x) in self.dotPositions:
-                self.grid[y] = row[:x] + str(dotCount) + row[x+1:] # Mark the visted node with a '.'
+                self.grid[y] = row[:x] + chars[dotCount-1] + row[x+1:] #  Mark the visted dot with the dot number%10
                 dotCount -= 1
+                dotsRemaining += 1
             else:
-                self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with the dot number
-            curr = self.parents[curr]
+                self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
+            curr = self.parents[(curr, dotsRemaining)]
 
 if __name__ == "__main__":
 
