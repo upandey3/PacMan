@@ -125,23 +125,23 @@ class MazeSearch:
         frontier = PriorityQueue() # Intialize the a priority queue
         dots = self.getDotPositions()
         score = self.averageDistance(self.start, list(dots)) # Manhattan distance for Greedy, MDist + Cost(0) for A*
-        explored = set()
         parents = [self.start]
         # parents = {self.start : -1}
-        frontier.put((score, self.start, 0, dots, explored, parents))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int, {dots})
+        frontier.put((score, self.start, 0, dots, parents))   # Frontier: ((x, y), path cost) : tuple(tuple(x, y), int, {dots})
         self.frontierMap[(self.start, tuple(dots))] = 0 # Map of nodes to path cost
 
         while not frontier.empty():
             t = frontier.get()       # Remove from frontier
-            _, node, cost, dots, explored, parents = t  # (score, (y, x), cost, dots)
+            _, node, cost, dots, parents = t  # (score, (y, x), cost, dots)
 
             if node in ignoreMap and ignoreMap[node] == cost: # If node has inefficient path cost
                 continue
 
             if (node, tuple(dots)) in self.frontierMap:
                 del self.frontierMap[(node, tuple(dots))]
-            explored = set(explored)
-            explored.add((node, tuple(dots)))#, len(dots)))
+            self.explored.add((node, tuple(dots)))
+            # explored = set(explored)
+            # explored.add((node, tuple(dots)))#, len(dots)))
             # self.explored.add((node, tuple(dots)))    # Add to Explored set: ((y, x), R)
 
             if node in dots:
@@ -149,12 +149,12 @@ class MazeSearch:
                 dots.remove(node)  # If a dot position is found, remove it from the dots set
                 if len(dots) == 0:  # Goal test - if all the dot positions have been found
                     self.markSolution(node, parents)
-                    return self.grid, cost, len(explored)
+                    return self.grid, cost, len(self.explored)
 
             neighbors = self.getNeighbors(node)
             for n in neighbors:           # Put all the valid neighbors in the frontier
                 # Check if already explored
-                if (n, tuple(dots)) in explored:
+                if (n, tuple(dots)) in self.explored:
                     continue
 
                 if algo is Algo.A_STAR: # if A*, score is f = g(cost) + h(mDist)
@@ -171,11 +171,9 @@ class MazeSearch:
 
                 p = list(parents)
                 p.append(n)
-                frontier.put((score, n, cost+1, dots, explored, p)) # Put in the incremented cost
+                frontier.put((score, n, cost+1, dots, p)) # Put in the incremented cost
                 self.frontierMap[(n, tuple(dots))] = cost+1
 
-        self.markSolution(node, parents)
-        return self.grid, cost, len(self.explored)
         raise Exception('Frontier became empty without a solution')
 
     # Prints the final solution path and numbers all the dot positions in the order explored
@@ -195,7 +193,8 @@ class MazeSearch:
                 self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
             # print(''.join(self.grid))
 
-    def markSolutionDB(self, curr):
+    def markSolutionDB(self, curr, parents=None):
+        parents = self.parents if parents is None else parents
         dotCount = self.dotCount
         while (curr != -1):
             y, x = curr; row = self.grid[y] # Get coordinates an corresponding row
@@ -206,7 +205,7 @@ class MazeSearch:
                 dotCount -= 1
             else:
                 self.grid[y] = row[:x] + '.' + row[x+1:] # Mark the visted node with a '.'
-            curr = self.parents[curr]
+            curr = parents[curr]
 
 if __name__ == "__main__":
 
